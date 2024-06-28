@@ -15,7 +15,6 @@ if(isSilent)
 }
 
 // Setup
-import './index.css';
 import * as Demo from './Demo';
 
 window.addEventListener('load', ev =>
