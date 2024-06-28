@@ -16,9 +16,7 @@
     "lint": "eslint \"**/*.ts\""
   },
   "dependencies": {
-    "three": "^0.147.0"
-  },
-  "devDependencies": {
+    "three": "^0.147.0",
     "@types/node": "^20.12.8",
     "@types/three": "^0.147.0",
     "@types/webpack": "^5.28.5",
