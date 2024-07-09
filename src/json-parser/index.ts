@@ -8,7 +8,8 @@ interface MatMatrix {
     metalness: THREE.Texture | number,
     roughness: THREE.Texture | number,
     transparent: boolean,
-    opacity: number
+    opacity: number,
+    transmission: number
 }
 
 interface BufferGeos {
@@ -46,7 +47,7 @@ export class ObjParser {
 
         // final meshes
         this.mergedGeo = null
-        this.mergedMat = new THREE.MeshStandardMaterial
+        this.mergedMat = new THREE.MeshPhysicalMaterial
         this.finalMesh = null
 
         this.parseModel()
@@ -55,14 +56,14 @@ export class ObjParser {
     url: string;
     group: THREE.Group | null;
 
-    allMaterials: THREE.MeshStandardMaterial[];
+    allMaterials: THREE.MeshPhysicalMaterial[];
     matMatrixes: MatMatrix[];
     canvas2D: HTMLCanvasElement | null;
     ctx: CanvasRenderingContext2D | null
     parsedBufferGeos: BufferGeos[] = []
     bufferGeos: THREE.BufferGeometry[] = []
     mergedGeo: THREE.BufferGeometry | null
-    mergedMat: THREE.MeshStandardMaterial
+    mergedMat: THREE.MeshPhysicalMaterial
     diffuseMap: THREE.CanvasTexture | THREE.Texture | null
     alphaMap: THREE.CanvasTexture | THREE.Texture | null
     metalnessMap: THREE.CanvasTexture | THREE.Texture | null
@@ -77,6 +78,7 @@ export class ObjParser {
 
 
     parseModel(): void {
+
         const loader = new THREE.ObjectLoader();
         const load = async function modelLoader(url: string) {
             return new Promise((resolve, reject) => {
@@ -107,6 +109,10 @@ export class ObjParser {
                 child.updateMatrix()
 
                 const materials = child.material
+
+                // materials.forEach((item: THREE.MeshPhysicalMaterial) => {
+                // })
+
                 const matsAssigned = materials.map((item: THREE.MeshStandardMaterial) => item.uuid)
                 const geo = child.geometry.clone() as THREE.BufferGeometry
                 geo.clearGroups();
@@ -118,8 +124,6 @@ export class ObjParser {
                 if (child.parent?.parent) {
                     geo.applyMatrix4(child.parent.parent.matrix)
                 }
-
-                // do
 
                 bufferGeos.push({
                     geo: geo,
@@ -137,7 +141,26 @@ export class ObjParser {
 
         this.parsedBufferGeos = bufferGeos
 
-        this.combineAllMaterialsIntoOne()
+        const meshes: THREE.Mesh[] = []
+
+        bufferGeos.forEach((item: BufferGeos, key) => {
+            const mesh = this.createMatrixForEachMesh(item, key)
+            meshes.push(mesh)
+        })
+
+        const group = new THREE.Group()
+
+        meshes.forEach(mesh => {
+            group.add(mesh.clone())
+            this.scene.add(mesh.clone())
+        })
+
+        if (this.group) {
+            this.scene.add(this.group)
+        }
+
+
+        this.exportGroup(group)
     }
 
 
@@ -146,6 +169,109 @@ export class ObjParser {
         if (this.allMaterials.length === 0) return
         this.createMatrix(Math.ceil(Math.sqrt(this.allMaterials.length)))
     }
+
+    createMatrixForEachMesh(item: BufferGeos, key: number) {
+
+        const matMatrixes = []
+        const geos = []
+        const geometry = item.geo
+        const num = Math.ceil(Math.sqrt(item.matsAssigned.length))
+
+
+        for (let i = 0; i < num * num; i++) {
+
+            const matIndex = item.matsAssigned[i]
+
+            if (!this.allMaterials[i]) {
+                matMatrixes.push(null)
+                geos.push(null)
+                break
+            }
+            const filteredMat = this.allMaterials.find(item => item.uuid === matIndex)
+
+            if (!filteredMat) {
+                matMatrixes.push(null)
+                geos.push(null)
+                break
+            }
+            const id = filteredMat.uuid
+            geos.push(geometry.clone())
+
+            const color = filteredMat.map ? filteredMat.map : filteredMat.color
+            const metalness = filteredMat.metalnessMap ? filteredMat.metalnessMap : filteredMat.metalness
+            const roughness = filteredMat.roughnessMap ? filteredMat.roughnessMap : filteredMat.roughness
+            matMatrixes.push({
+                id: id,
+                color: color,
+                metalness: metalness,
+                roughness: roughness,
+                transparent: filteredMat.transparent,
+                opacity: filteredMat.opacity,
+                transmission: filteredMat.transmission
+            })
+        }
+
+        // RETURNS
+        // matMatrixes
+        // geos
+
+        const mergedGeo = geometry
+        const mergedMat = this.createImageDataOfGeos(matMatrixes, key)
+
+        const mesh = new THREE.Mesh(mergedGeo, mergedMat)
+        return mesh
+    }
+
+
+    moveUvsOfGeos(geosList: (THREE.BufferGeometry | null)[]) {
+
+        const listCount = geosList.length
+        const multiple = Math.sqrt(listCount)
+
+        const flatArrayCoordinates = this.getFlatArrayCoordinates(Array.from(Array(multiple * multiple).keys()), multiple);
+
+        geosList.forEach((geo, key) => {
+            if (!geo) return
+
+            const uvAttribute = geo.attributes.uv;
+            const count = uvAttribute.count;
+
+            const offsetX = flatArrayCoordinates[key].x / multiple;
+            const offsetY = flatArrayCoordinates[key].y / multiple;
+
+            const allX = []
+            const allY = []
+
+            for (let i = 0; i < count; i++) {
+                const u = uvAttribute.getX(i);
+                allX.push(u)
+                const v = uvAttribute.getY(i);
+                allY.push(v)
+            }
+
+            const minX = Math.min(...allX)
+            const maxX = Math.max(...allX)
+            const centerX = (maxX - minX) / 2
+
+            const minY = Math.min(...allY)
+            const maxY = Math.max(...allY)
+            const centerY = (maxY - minY) / 2
+
+            const centerVec = new THREE.Vector2(centerX, centerY);
+
+            for (let i = 0; i < count; i++) {
+                const u = uvAttribute.getX(i) / multiple + offsetX;
+                const v = uvAttribute.getY(i) / multiple + offsetY;
+                uvAttribute.setXY(i, u, v);
+            }
+            return geo
+        })
+
+        const geos = geosList.filter(item => item) as THREE.BufferGeometry[]
+        const mergedGeo = mergeBufferGeometries(geos);
+        return mergedGeo
+    }
+
 
     createMatrix(num: number) {
         const matMatrixes = []
@@ -259,6 +385,110 @@ export class ObjParser {
         this.createMesh()
     }
 
+
+    createImageDataOfGeos(materialsMatrices: (MatMatrix | null)[], key: number) {
+
+        const count = materialsMatrices.length
+        const multiple = Math.sqrt(count)
+        const size = this.textureSize
+
+        const canvas = document.createElement('canvas');
+        const canvas2 = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvas2.width = size;
+        canvas2.height = size;
+
+        const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+        const ctx2 = canvas2.getContext("2d") as CanvasRenderingContext2D;
+
+        const diffuseMap = this.createDiffuseMapFromMatrices(multiple, canvas, materialsMatrices, ctx);
+        const transmitionMap = this.createTransmitionMapFromMatrices(multiple, canvas2, materialsMatrices, ctx2)
+
+        const mergedMaterial = new THREE.MeshPhysicalMaterial();
+
+        const firstMat = materialsMatrices[0]
+        if (!firstMat) return
+
+        mergedMaterial.map = diffuseMap;
+        mergedMaterial.transparent = true;
+        mergedMaterial.depthTest = true;
+        mergedMaterial.depthWrite = true;
+        mergedMaterial.alphaTest = 0.5;
+        mergedMaterial.blendSrcAlpha = 2;
+        mergedMaterial.side = THREE.DoubleSide;
+        mergedMaterial.ior = 7 / 3;
+        mergedMaterial.roughness = firstMat.roughness as number;
+        mergedMaterial.metalness = firstMat.metalness as number;
+        mergedMaterial.transmission = 1
+        mergedMaterial.transmissionMap = transmitionMap
+
+        if (this.debugTextures) {
+            const image = canvas2.toDataURL("image/png").replace("image/png", "image/octet-stream");
+            window.location.href = image;
+        }
+
+
+        return mergedMaterial
+
+    }
+
+    createDiffuseMapFromMatrices(multiple: number, canvas2D: HTMLCanvasElement, matMatrixes: (MatMatrix | null)[], ctx: CanvasRenderingContext2D) {
+
+        matMatrixes.forEach((mat) => {
+
+            const mapping = [
+                0,
+                0,
+                this.textureSize,
+                this.textureSize,
+            ];
+
+            if (!mat) return
+
+            if (mat.color instanceof THREE.Texture) {
+                this.assignTextureToSpecifiedCtx(mat.color, mapping, multiple, ctx)
+            }
+
+            if (mat.color instanceof THREE.Color) {
+                this.assignColorAlphaToSpecifiedCtx(mat.color, mat.transparent ? mat.opacity : 1, mapping, ctx)
+            }
+        })
+
+        return new THREE.CanvasTexture(canvas2D);
+    }
+
+    createTransmitionMapFromMatrices(multiple: number, canvas2D: HTMLCanvasElement, matMatrixes: (MatMatrix | null)[], ctx: CanvasRenderingContext2D) {
+
+        matMatrixes.forEach((mat) => {
+
+            const mapping = [
+                0,
+                0,
+                this.textureSize,
+                this.textureSize,
+            ];
+
+            if (!mat) return
+
+            if (mat.color instanceof THREE.Color) {
+                this.assignColorAlphaToSpecifiedCtx(
+                    new THREE.Color(
+                        mat.transmission,
+                        mat.transmission,
+                        mat.transmission
+                    ),
+                    1,
+                    mapping,
+                    ctx
+                )
+            }
+        })
+
+        return new THREE.CanvasTexture(canvas2D);
+    }
+
+
     getMapping(index: number, multiple: number) {
 
         const flatArrayCoordinates = this.getFlatArrayCoordinates(Array.from(Array(multiple * multiple).keys()), multiple);
@@ -353,6 +583,60 @@ export class ObjParser {
         )
     }
 
+    assignTextureToSpecifiedCtx(texture: THREE.Texture, mapping: number[], multiple: number, ctx: CanvasRenderingContext2D) {
+        ctx.drawImage(
+            texture.source.data,
+            mapping[0] - texture.offset.x * this.textureSize,
+            mapping[1] - texture.offset.y * this.textureSize,
+            mapping[2] * 1 / texture.repeat.x,
+            mapping[3] * 1 / texture.repeat.y,
+        )
+    }
+
+    assignTextureToSpecifiedCtxTransmittion(texture: THREE.Texture, mapping: number[], multiple: number, ctx: CanvasRenderingContext2D) {
+        ctx.drawImage(
+            texture.source.data,
+            mapping[0] - texture.offset.x * this.textureSize,
+            mapping[1] - texture.offset.y * this.textureSize,
+            mapping[2] * 1 / texture.repeat.x,
+            mapping[3] * 1 / texture.repeat.y,
+        )
+    }
+
+    assignColorAlphaToSpecifiedCtx(color: THREE.Color, aplha: number, mapping: number[], ctx: CanvasRenderingContext2D) {
+        ctx.fillStyle = `rgba(
+        ${color.r * 255},
+        ${color.g * 255},
+        ${color.b * 255},
+        ${aplha}
+        )`;
+
+        ctx.fillRect(
+            mapping[0],
+            mapping[1],
+            mapping[2],
+            mapping[3]
+        );
+    }
+
+
+    assignColorAlphaToSpecifiedCtxTransmittion(color: THREE.Color, aplha: number, mapping: number[], ctx: CanvasRenderingContext2D) {
+        ctx.fillStyle = `rgba(
+        ${color.r * 255},
+        ${color.g * 255},
+        ${color.b * 255},
+        ${aplha}
+        )`;
+
+        ctx.fillRect(
+            mapping[0],
+            mapping[1],
+            mapping[2],
+            mapping[3]
+        );
+    }
+
+
     assignColorToCtx(color: THREE.Color, mapping: number[]) {
         if (!this.ctx) return
 
@@ -417,6 +701,7 @@ export class ObjParser {
     moveUvs() {
 
         const geosList = this.bufferGeos
+
         const listCount = geosList.length
         const multiple = Math.sqrt(listCount)
 
@@ -462,6 +747,7 @@ export class ObjParser {
 
     mergeGeos() {
         const geos = this.bufferGeos.filter(item => item)
+
         const mergedGeo = mergeBufferGeometries(geos);
         this.mergedGeo = mergedGeo
         this.createMesh()
@@ -488,9 +774,8 @@ export class ObjParser {
         mesh.scale.set(0.02, 0.02, 0.02)
         this.finalMesh = mesh
 
-        this.scene.add(mesh)
+        // this.scene.add(mesh)
 
-        this.exportModel(this.finalMesh)
     }
 
     returnFinalMesh() {
@@ -522,6 +807,37 @@ export class ObjParser {
 
         exporter.parse(
             mesh,
+            function (gltf) {
+                saveArrayBuffer(gltf as ArrayBuffer, 'scene.glb');
+            },
+
+            function (error) {
+                console.log(error);
+            }, {
+            binary: true
+        }
+        );
+    }
+
+    exportGroup(group: THREE.Group) {
+        const exporter = new GLTFExporter();
+
+        function saveArrayBuffer(buffer: ArrayBuffer, filename: string) {
+            save(new Blob([buffer], { type: 'application/octet-stream' }), filename);
+        }
+
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        document.body.appendChild(link);
+
+        function save(blob: Blob, filename: string) {
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        exporter.parse(
+            group,
             function (gltf) {
                 saveArrayBuffer(gltf as ArrayBuffer, 'scene.glb');
             },

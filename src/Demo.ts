@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ObjParser } from './json-parser/index';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Buffer } from "buffer";
 
 console.log(`three ${THREE.REVISION}`);
 
@@ -9,6 +10,7 @@ const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true
 });
+
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.physicallyCorrectLights = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -79,13 +81,6 @@ export function createDemo() {
 
 window.addEventListener('load', () => {
 
-    // const mod = model.returnMainModel()
-    // mod?.scale.set(0.001, 0.001, 0.001)
-
-    // if (mod) {
-    //     scene.add(mod)
-    // }
-
 
     const actualBtn = document.getElementById('actual-btn');
 
@@ -100,19 +95,21 @@ window.addEventListener('load', () => {
 
     function readURL(input: HTMLInputElement) {
         if (input.files && input.files[0]) {
-            var reader = new FileReader();
-
-            reader.onload = function (e) {
-                // console.log(e.target.result)
-                if (e.target && e.target.result) {
-                    const modelPar = e.target.result as string
-                    new ObjParser(modelPar, scene)
-                }
-            }
-
-            reader.readAsDataURL(input.files[0]);
+            const reader = new FileReader();
+            reader.onload = onReaderLoad;
+            reader.readAsText(input.files[0]);
         }
     }
 
-
+    function onReaderLoad(event: any) {
+        const text = event.target.result
+        const text1 = text.split("canvases:")
+        const one = text1[0]
+        one.replace("canvases:", "")
+        const obj = JSON.parse(one)
+        const encoded = btoa(JSON.stringify(obj))
+        const str = "data:application/json;base64,"
+        const str2 = str.concat(encoded)
+        new ObjParser(str2, scene)
+    }
 });
