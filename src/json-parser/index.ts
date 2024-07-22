@@ -160,7 +160,7 @@ export class ObjParser {
         }
 
 
-        this.exportGroup(group)
+        // this.exportGroup(group)
     }
 
 
@@ -403,30 +403,34 @@ export class ObjParser {
         const ctx2 = canvas2.getContext("2d") as CanvasRenderingContext2D;
 
         const diffuseMap = this.createDiffuseMapFromMatrices(multiple, canvas, materialsMatrices, ctx);
+
         const transmitionMap = this.createTransmitionMapFromMatrices(multiple, canvas2, materialsMatrices, ctx2)
+        transmitionMap.encoding
 
         const mergedMaterial = new THREE.MeshPhysicalMaterial();
 
         const firstMat = materialsMatrices[0]
         if (!firstMat) return
 
+        mergedMaterial.alphaMap = transmitionMap;
         mergedMaterial.map = diffuseMap;
         mergedMaterial.transparent = true;
         mergedMaterial.depthTest = true;
         mergedMaterial.depthWrite = true;
-        mergedMaterial.alphaTest = 0.5;
+        // mergedMaterial.alphaTest = 0.5;
         mergedMaterial.blendSrcAlpha = 2;
         mergedMaterial.side = THREE.DoubleSide;
         mergedMaterial.ior = 7 / 3;
         mergedMaterial.roughness = firstMat.roughness as number;
         mergedMaterial.metalness = firstMat.metalness as number;
-        mergedMaterial.transmission = 1
-        mergedMaterial.transmissionMap = transmitionMap
 
-        if (this.debugTextures) {
-            const image = canvas2.toDataURL("image/png").replace("image/png", "image/octet-stream");
-            window.location.href = image;
-        }
+        // mergedMaterial.transmission = 1
+        // mergedMaterial.opacity = 1
+
+        // if (key === 1) {
+        //     const image = canvas2.toDataURL("image/png").replace("image/png", "image/octet-stream");
+        //     window.location.href = image;
+        // }
 
 
         return mergedMaterial
@@ -471,14 +475,18 @@ export class ObjParser {
 
             if (!mat) return
 
+            if (mat.color instanceof THREE.Texture) {
+                this.assignAlphaTextureToSpecifiedCtx(mat.color, mapping, 1, ctx)
+            }
+
             if (mat.color instanceof THREE.Color) {
                 this.assignColorAlphaToSpecifiedCtx(
                     new THREE.Color(
-                        mat.transmission,
-                        mat.transmission,
-                        mat.transmission
+                        1 - mat.transmission + 0.7,
+                        1 - mat.transmission + 0.7,
+                        1 - mat.transmission + 0.7
                     ),
-                    1,
+                    1 - mat.transmission + 0.5,
                     mapping,
                     ctx
                 )
@@ -591,6 +599,52 @@ export class ObjParser {
             mapping[2] * 1 / texture.repeat.x,
             mapping[3] * 1 / texture.repeat.y,
         )
+    }
+
+    assignAlphaTextureToSpecifiedCtx(texture: THREE.Texture, mapping: number[], multiple: number, ctx: CanvasRenderingContext2D) {
+
+        const canvas = document.createElement('canvas');
+        canvas.width = this.textureSize;
+        canvas.height = this.textureSize;
+
+        const ctx2 = canvas.getContext("2d");
+
+        if (!ctx2) return
+
+        ctx2.drawImage(
+            texture.source.data,
+            mapping[0] - texture.offset.x * this.textureSize,
+            mapping[1] - texture.offset.y * this.textureSize,
+            mapping[2] * 1 / texture.repeat.x,
+            mapping[3] * 1 / texture.repeat.y,
+        )
+
+        const myImage = ctx2.getImageData(
+            0,
+            0,
+            this.textureSize,
+            this.textureSize
+        );
+
+
+        for (var i = 0; i < myImage.data.length; i += 4) {
+            // Get unitary value of the pixel
+            const r = myImage.data[i] / 255;
+            const g = myImage.data[i + 1] / 255;
+            const b = myImage.data[i + 2] / 255;
+            myImage.data[i + 0] *= 255;
+            myImage.data[i + 1] *= 255;
+            myImage.data[i + 2] *= 255;
+        }
+
+
+        ctx2.putImageData(
+            myImage,
+            0,
+            0
+        )
+
+        ctx.drawImage(canvas, 0, 0, this.textureSize, this.textureSize)
     }
 
     assignTextureToSpecifiedCtxTransmittion(texture: THREE.Texture, mapping: number[], multiple: number, ctx: CanvasRenderingContext2D) {
