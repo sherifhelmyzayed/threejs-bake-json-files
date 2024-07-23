@@ -171,16 +171,7 @@ export class ObjParser {
             this.scene.add(mesh.clone())
         })
 
-        if (this.group) {
-            this.scene.add(this.group)
-        }
-
         this.convertedGroup = group;
-
-
-
-
-        // this.exportGroup(group)
     }
 
     exportConvertedGroup() {
