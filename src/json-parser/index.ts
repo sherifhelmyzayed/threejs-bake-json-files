@@ -49,6 +49,7 @@ export class ObjParser {
         this.mergedGeo = null
         this.mergedMat = new THREE.MeshPhysicalMaterial
         this.finalMesh = null
+        this.convertedGroup = new THREE.Group
 
         this.parseModel()
     }
@@ -73,6 +74,8 @@ export class ObjParser {
 
     debugModel: boolean;
     debugTextures: boolean;
+
+    convertedGroup: THREE.Group
 
     finalMesh: THREE.Mesh | null
 
@@ -159,8 +162,23 @@ export class ObjParser {
             this.scene.add(this.group)
         }
 
+        this.convertedGroup = group
+
 
         // this.exportGroup(group)
+    }
+
+    exportConvertedGroup () {
+        if (this.convertedGroup) {
+            this.exportGroup(this.convertedGroup)
+        }
+    }
+
+    
+    exportOriginalGroup () {
+        if (this.group) {
+            this.exportGroup(this.group)
+        }
     }
 
 

@@ -110,6 +110,17 @@ window.addEventListener('load', () => {
         const encoded = btoa(JSON.stringify(obj))
         const str = "data:application/json;base64,"
         const str2 = str.concat(encoded)
-        new ObjParser(str2, scene)
+        const objparsed = new ObjParser(str2, scene)
+
+        const downloadBtn1 = document.getElementById('dl1') as HTMLDivElement;
+        downloadBtn1.addEventListener('click', () => {
+            objparsed.exportOriginalGroup()
+        })
+
+        const downloadBtn2 = document.getElementById('dl1') as HTMLDivElement;
+        downloadBtn2.addEventListener('click', () => {
+            objparsed.exportConvertedGroup()
+        })
+
     }
 });
