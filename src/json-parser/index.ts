@@ -148,6 +148,19 @@ export class ObjParser {
 
         bufferGeos.forEach((item: BufferGeos, key) => {
             const mesh = this.createMatrixForEachMesh(item, key)
+
+
+            const texturesContainer = document.getElementById('texturesContainer')
+
+            const el = document.createElement("a");
+
+            const img = document.createElement("img");
+            img.src = mesh.material.map?.image.toDataURL("image/png").replace("image/png", "image/octet-stream");
+            img.classList.add('texture')
+            el.setAttribute('download', "diffuse-map.png")
+            el.setAttribute('href', "/diffuse-map.png")
+            el.appendChild(img)
+            texturesContainer?.appendChild(el)
             meshes.push(mesh)
         })
 
@@ -162,20 +175,22 @@ export class ObjParser {
             this.scene.add(this.group)
         }
 
-        this.convertedGroup = group
+        this.convertedGroup = group;
+
+
 
 
         // this.exportGroup(group)
     }
 
-    exportConvertedGroup () {
+    exportConvertedGroup() {
         if (this.convertedGroup) {
             this.exportGroup(this.convertedGroup)
         }
     }
 
-    
-    exportOriginalGroup () {
+
+    exportOriginalGroup() {
         if (this.group) {
             this.exportGroup(this.group)
         }
