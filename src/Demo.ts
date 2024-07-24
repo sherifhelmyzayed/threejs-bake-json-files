@@ -114,11 +114,13 @@ window.addEventListener('load', () => {
 
         const downloadBtn1 = document.getElementById('dl1') as HTMLDivElement;
         downloadBtn1.addEventListener('click', () => {
+            console.log("CLICK")
             objparsed.exportOriginalGroup()
         })
 
-        const downloadBtn2 = document.getElementById('dl1') as HTMLDivElement;
+        const downloadBtn2 = document.getElementById('dl2') as HTMLDivElement;
         downloadBtn2.addEventListener('click', () => {
+            console.log("CLICK2")
             objparsed.exportConvertedGroup()
         })
 
