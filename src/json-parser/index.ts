@@ -347,53 +347,11 @@ export class ObjParser {
         const size = this.textureSize
 
         const canvas = document.createElement('canvas');
-        const canvasalpha = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
 
         this.canvas2D = canvas
         this.ctx = this.canvas2D.getContext("2d");
-        const ctx2 = canvasalpha.getContext("2d");
-
-        const arr = [
-            {
-                id: 1,
-                color: new THREE.Color('red')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('yellow')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('pink')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('violet')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('brown')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('cyan')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('orange')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('yellow')
-            },
-            {
-                id: 1,
-                color: new THREE.Color('blue')
-            },
-        ]
-
 
 
         this.diffuseMap = this.createDiffuseMap(multiple, this.canvas2D);
@@ -429,37 +387,55 @@ export class ObjParser {
         const diffuseMap = this.createDiffuseMapFromMatrices(multiple, canvas, materialsMatrices, ctx);
 
         const transmitionMap = this.createTransmitionMapFromMatrices(multiple, canvas2, materialsMatrices, ctx2)
-        transmitionMap.encoding
+
+        this.amendAlpha(ctx, ctx2)
 
         const mergedMaterial = new THREE.MeshPhysicalMaterial();
 
         const firstMat = materialsMatrices[0]
         if (!firstMat) return
 
-        mergedMaterial.alphaMap = transmitionMap;
         mergedMaterial.map = diffuseMap;
+        mergedMaterial.alphaMap = transmitionMap;
         mergedMaterial.transparent = true;
         mergedMaterial.depthTest = true;
         mergedMaterial.depthWrite = true;
-        // mergedMaterial.alphaTest = 0.5;
-        mergedMaterial.blendSrcAlpha = 2;
-        mergedMaterial.side = THREE.DoubleSide;
+        mergedMaterial.side = THREE.FrontSide;
         mergedMaterial.ior = 7 / 3;
         mergedMaterial.roughness = firstMat.roughness as number;
         mergedMaterial.metalness = firstMat.metalness as number;
 
-        // mergedMaterial.transmission = 1
-        // mergedMaterial.opacity = 1
-
-        // if (key === 1) {
-        //     const image = canvas2.toDataURL("image/png").replace("image/png", "image/octet-stream");
-        //     window.location.href = image;
-        // }
-
-
         return mergedMaterial
 
     }
+
+    amendAlpha(ctx: CanvasRenderingContext2D, ctx2: CanvasRenderingContext2D) {
+
+        const diffuseMap = ctx.getImageData(
+            0,
+            0,
+            this.textureSize,
+            this.textureSize
+        );
+
+        const alphaMap = ctx2.getImageData(
+            0,
+            0,
+            this.textureSize,
+            this.textureSize
+        );
+
+        for (var i = 0; i < diffuseMap.data.length; i += 4) {
+            diffuseMap.data[i + 3] = alphaMap.data[i + 3]
+        }
+
+        ctx.putImageData(
+            diffuseMap,
+            0,
+            0
+        )
+    }
+
 
     createDiffuseMapFromMatrices(multiple: number, canvas2D: HTMLCanvasElement, matMatrixes: (MatMatrix | null)[], ctx: CanvasRenderingContext2D) {
 
@@ -510,7 +486,7 @@ export class ObjParser {
                         1 - mat.transmission + 0.7,
                         1 - mat.transmission + 0.7
                     ),
-                    1 - mat.transmission + 0.5,
+                    1 - mat.transmission + 0.7,
                     mapping,
                     ctx
                 )
@@ -917,7 +893,7 @@ export class ObjParser {
         exporter.parse(
             group,
             function (gltf) {
-                saveArrayBuffer(gltf as ArrayBuffer, 'scene.glb');
+                saveArrayBuffer(gltf as ArrayBuffer, 'scene.gltf');
             },
 
             function (error) {
