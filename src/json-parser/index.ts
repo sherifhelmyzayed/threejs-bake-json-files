@@ -395,12 +395,15 @@ export class ObjParser {
         const firstMat = materialsMatrices[0]
         if (!firstMat) return
 
+        
+        const isTransparent = materialsMatrices.some(item => item?.transmission && item.transmission > 0)
+
         mergedMaterial.map = diffuseMap;
         mergedMaterial.alphaMap = transmitionMap;
-        mergedMaterial.transparent = true;
+        mergedMaterial.transparent = isTransparent;
         mergedMaterial.depthTest = true;
         mergedMaterial.depthWrite = true;
-        mergedMaterial.side = THREE.FrontSide;
+        mergedMaterial.side = THREE.DoubleSide;
         mergedMaterial.ior = 7 / 3;
         mergedMaterial.roughness = firstMat.roughness as number;
         mergedMaterial.metalness = firstMat.metalness as number;
@@ -482,11 +485,11 @@ export class ObjParser {
             if (mat.color instanceof THREE.Color) {
                 this.assignColorAlphaToSpecifiedCtx(
                     new THREE.Color(
-                        1 - mat.transmission + 0.7,
-                        1 - mat.transmission + 0.7,
-                        1 - mat.transmission + 0.7
+                        1 - mat.transmission + 0.4,
+                        1 - mat.transmission + 0.4,
+                        1 - mat.transmission + 0.4
                     ),
-                    1 - mat.transmission + 0.7,
+                    1 - mat.transmission + 0.4,
                     mapping,
                     ctx
                 )
